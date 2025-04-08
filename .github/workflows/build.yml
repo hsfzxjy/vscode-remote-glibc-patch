@@ -1,0 +1,54 @@
+name: Build Sysroot
+
+on:
+  - workflow_dispatch
+
+jobs:
+  build-sysroot:
+    strategy:
+      matrix:
+        arch: ["x86_64"]
+        kernel: ["3.4.113", "4.1.49", "4.14.329", "5.10.233"]
+        lib: ["gcc-8.5.0-glibc-2.28"]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      CONFIG_TMPL: "${{ matrix.arch }}-${{ matrix.lib }}"
+      TARGET: "${{ matrix.arch }}-kernel-${{ matrix.kernel }}-${{ matrix.lib }}"
+      BUILT_DIR: "${{ matrix.arch }}-linux-gnu"
+    container:
+      image: ghcr.io/hsfzxjy/ubuntu-ct-ng:latest
+      credentials:
+        username: hsfzxjy
+        password: ${{ secrets.DOCKER_CONTAINER_REGISTRY_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          mkdir -p build/downloads
+          python3 configs/patch_linux.py "${{ matrix.kernel }}" "configs/${{ env.CONFIG_TMPL }}.config" > build/.config
+      - uses: actions/cache@v4
+        id: cache-build
+        with:
+          path: |
+            build/*gnu
+          key: "build-${{ env.TARGET }}"
+      - run: |
+          cd build
+          ct-ng build
+        if: steps.cache-build.outputs.cache-hit != 'true'
+      - run: |
+          pwd
+          mkdir pack
+          cd pack
+          wget "https://github.com/NixOS/patchelf/releases/download/0.18.0/patchelf-0.18.0-${{ matrix.arch }}.tar.gz" -O /tmp/patchelf.tgz
+          tar xzvf /tmp/patchelf.tgz ./bin/patchelf -O > ./patchelf
+          chmod +x patchelf
+          cp -rv "../build/${{ env.BUILT_DIR }}" .
+          cp ../init.sh .
+          tar czvf "${{ env.TARGET }}.tgz" patchelf init.sh "${{ env.BUILT_DIR }}"
+      - uses: ncipollo/release-action@v1
+        with:
+          artifacts: "pack/${{ env.TARGET }}.tgz"
+          tag: BUILD
+          allowUpdates: true

@@ -42,4 +42,4 @@ Add the following lines to your shell profile:
 eval "$(your/custom/path/init.sh)"
 ```
 
-Depending on your use case, you may want to modify `~/.bashrc` (for yourself only) or `/etc/bashrc`/`/etc/profile` (for all users).
+Depending on your use case, you may want to modify `~/.bashrc`/`~/.bash_profile` (for yourself only) or `/etc/bashrc`/`/etc/profile` (for all users).
